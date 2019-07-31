@@ -9,7 +9,7 @@
 	\organization: 	"ixi audio",
 	\country: 		"uk - es - is",
 	\since: 		"2000",
-	\ext_dependancy: "none",
+	\ext_dependency: "none",
 	\url:           "http://www.ixi-audio.net",
 \helpdoc: "help/ixiViews.html"
 )
