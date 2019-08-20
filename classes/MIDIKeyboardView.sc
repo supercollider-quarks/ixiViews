@@ -1,60 +1,38 @@
 // (c) 2006-2010, Thor Magnusson - www.ixi-audio.net
 // GNU license - google it.
 
-MIDIKeyboard {
+MIDIKeyboardView : UserView {
 
-	var <>keys; 
+	var <>keys;
 	var trackKey, chosenkey, mouseTracker;
-	var win, bounds, octaves, startnote;
+	var octaves, startnote;
 	var downAction, upAction, trackAction;
-	
-	*new { arg w, bounds, octaves, startnote; 
-		^super.new.initMIDIKeyboard(w, bounds, octaves, startnote);
-	}
-	
-	initMIDIKeyboard { arg w, argbounds, argoctaves=3, argstartnote;
-		var r, pix, pen;
-		octaves = argoctaves ? 4;
-		bounds = argbounds ? Rect(20, 10, 364, 60);
-				
-		if((win= w).isNil, {
-			win = Window.new("MIDI Keyboard",
-				Rect(100, 250, bounds.width + 40, bounds.height+30));
-			win.front
-		});
 
- 		mouseTracker = UserView.new(win, bounds); // thanks ron!
- 		bounds = mouseTracker.bounds;
+	*new { arg w, bounds, octaves, startnote;
+		bounds = bounds ? Rect(20, 10, 364, 60);
+		^super.new(w, bounds).initMIDIKeyboard(octaves, startnote);
+	}
+
+	initMIDIKeyboard { arg argoctaves=3, argstartnote;
+		var r, pen;
+ 		var bounds = this.bounds;
+		octaves = argoctaves ? 4;
 
 		pen	= Pen;
 
 		startnote = argstartnote ? 48;
 		trackKey = 0;
-		//pix = [0, 6, 10, 16, 20, 30, 36, 40, 46, 50, 56, 60];
-		pix = [ 0, 0.1, 0.17, 0.27, 0.33, 0.5, 0.6, 0.67, 0.77, 0.83, 0.93, 1 ]; // as above but normalized
 		keys = List.new;
-		
+
 		octaves.do({arg j;
 			12.do({arg i;
-				if((i == 1) || (i == 3) || (i == 6) || (i == 8) || (i == 10), { // black keys
-					r = Rect(	( (pix[i]*((bounds.width/octaves) -
-								(bounds.width/octaves/7))).round(1) + ((bounds.width/octaves)*j)).round(1)+1,
-							0, 
-							bounds.width/octaves/10, 
-							bounds.height/1.7);
-					keys.add(MIDIKey.new(startnote+i+(j*12), r, Color.black));
-				}, { // white keys
-					r = Rect(((pix[i]*((bounds.width/octaves) -
-								(bounds.width/octaves/7))).round(1) + ((bounds.width/octaves)*j)).round(1),
-							0, 
-							bounds.width/octaves/7, 
-							bounds.height);
-					keys.add(MIDIKey.new(startnote+i+(j*12), r, Color.white));
-				});
+				var note = startnote+i+(j*12);
+				keys.add(MIDIKey.new(note, MIDIKey.rect(bounds, octaves, j, note), MIDIKey.color(note)));
 			});
 		});
 
-		mouseTracker
+		this
+			.minSize_(Point(bounds.width, bounds.height))
 			.canFocus_(false)
 			//.relativeOrigin_(false)
 			.mouseDownAction_({|me, x, y, mod|
@@ -62,7 +40,7 @@ MIDIKeyboard {
 				trackKey = chosenkey;
 				chosenkey.color = Color.grey;
 				downAction.value(chosenkey.note);
-				this.refresh;	
+				this.refresh;
 			})
 			.mouseMoveAction_({|me, x, y, mod|
 				chosenkey = this.findNote(x, y);
@@ -82,37 +60,36 @@ MIDIKeyboard {
 				this.refresh;
 			})
 			.drawFunc_({
+				var bounds = this.bounds;
 				octaves.do({arg j;
 					// first draw the white keys
 					12.do({arg i;
-						var key;
+						var key, rect;
 						key = keys[i+(j*12)];
+						rect = key.updateRect(bounds, octaves, j);
 						if(key.type == Color.white, {
 							pen.color = Color.black;
-							pen.strokeRect(Rect(key.rect.left+0.5, key.rect.top+0.5, key.rect.width+0.5, key.rect.height-0.5));
+							pen.strokeRect(Rect(rect.left+0.5, rect.top+0.5, rect.width+0.5, rect.height-0.5));
 							pen.color = key.color; // white or grey
-							pen.fillRect(Rect(key.rect.left+0.5, key.rect.top+0.5, key.rect.width+0.5, key.rect.height-0.5));
+							pen.fillRect(Rect(rect.left+0.5, rect.top+0.5, rect.width+0.5, rect.height-0.5));
 						});
 					});
 					// and then draw the black keys on top of the white
 					12.do({arg i;
-						var key;
+						var key, rect;
 						key = keys[i+(j*12)];
+						rect = key.updateRect(bounds, octaves, j);
 						if(key.type == Color.black, {
 							pen.color = Color.black;
-							pen.strokeRect(Rect(key.rect.left+0.5, key.rect.top+0.5, key.rect.width, key.rect.height));
+							pen.strokeRect(Rect(rect.left+0.5, rect.top+0.5, rect.width, rect.height));
 							pen.color = key.color;
-							pen.fillRect(Rect(key.rect.left+0.5, key.rect.top+0.5, key.rect.width, key.rect.height));
+							pen.fillRect(Rect(rect.left+0.5, rect.top+0.5, rect.width, rect.height));
 						});
 					})
 				})
 			});
 	}
-	
-	refresh {
-		mouseTracker.refresh;
-	}
-	
+
 	keyDown { arg note, color; // midinote
 		if(note.isArray, {
 			note.do({arg note;
@@ -123,11 +100,11 @@ MIDIKeyboard {
 		}, {
 			if(this.inRange(note), {
 				keys[note - startnote].color = Color.grey;
-			});			
+			});
 		});
 		this.refresh;
 	}
-	
+
 	keyUp { arg note; // midinote
 //		if(this.inRange(note), {
 //			keys[note - startnote].color = keys[note - startnote].scalecolor;
@@ -141,34 +118,34 @@ MIDIKeyboard {
 		}, {
 			if(this.inRange(note), {
 				keys[note - startnote].color = keys[note - startnote].scalecolor;
-			});			
+			});
 		});
-		this.refresh;	
+		this.refresh;
 	}
-	
+
 	keyDownAction_ { arg func;
 		downAction = func;
 	}
-	
+
 	keyUpAction_ { arg func;
 		upAction = func;
 	}
-	
+
 	keyTrackAction_ { arg func;
 		trackAction = func;
 	}
-	
+
 	showScale {arg argscale, key=startnote, argcolor;
 		var color, scale, counter, transp;
 		this.clear; // erase scalecolors (make them their type)
 		counter = 0;
 		color = argcolor ? Color.red;
 		transp = key%12;
-		scale = argscale + transp + startnote;		
+		scale = argscale + transp + startnote;
 		keys.do({arg key, i;
 			key.color = key.type; // back to original color
 			if(((i-transp)%12 == 0)&&((i-transp)!=0), { counter = 0; scale = scale+12;});			if(key.note == scale[counter], {
-				counter = counter + 1; 
+				counter = counter + 1;
 				key.color = key.color.blend(color, 0.5);
 				key.scalecolor = key.color;
 				key.inscale = true;
@@ -176,7 +153,7 @@ MIDIKeyboard {
 		});
 		this.refresh;
 	}
-	
+
 	clear {
 		keys.do({arg key, i;
 			key.color = key.type; // back to original color
@@ -185,7 +162,7 @@ MIDIKeyboard {
 		});
 		this.refresh;
 	}
-	
+
 	// just for fun
 	playScale { arg argscale, key=startnote, int=0.5;
 		var scale = argscale;
@@ -198,7 +175,7 @@ MIDIKeyboard {
 				int.wait;
 			});		}).start;
 	}
-	
+
 	setColor {arg note, color;
 
 		var newcolor = keys[note - startnote].color.blend(color, 0.5);
@@ -206,119 +183,57 @@ MIDIKeyboard {
 		keys[note - startnote].scalecolor = newcolor;
 		this.refresh;
 	}
-	
+
 	getColor { arg note;
 		^keys[note - startnote].color;
 	}
-	
+
 	getType { arg note;
 		^keys[note - startnote].type;
 	}
 
-	
+
 	removeColor {arg note;
 		keys[note - startnote].scalecolor = keys[note - startnote].type;
 		keys[note - startnote].color = keys[note - startnote].type;
 		this.refresh;
 	}
-	
+
 	inScale {arg key;
 		^keys[key-startnote].inscale;
 	}
-	
+
 	retNote {arg key;
 		^keys[key].note;
 	}
-	
-	remove {
-		mouseTracker.remove;
-		win.refresh;
-	}
-	
+
 	// local function
 	findNote {arg x, y;
-		var chosenkeys;
+		var chosenkeys, bounds;
 		chosenkeys = [];
+		bounds = this.bounds;
 		keys.reverse.do({arg key;
-			if(key.rect.containsPoint(Point.new(x,y)), {
+			var rect = key.updateRect(bounds, octaves, ((key.note - startnote) / 12).floor.asInteger);
+			if(rect.containsPoint(Point.new(x,y)), {
 				chosenkeys = chosenkeys.add(key);
 			});
 		});
 		block{|break|
 			chosenkeys.do({arg key;
-				if(key.type == Color.black, { 
-					chosenkey = key; 
+				if(key.type == Color.black, {
+					chosenkey = key;
 					break.value; // the important part
 				}, {
-					chosenkey = key; 
+					chosenkey = key;
 				});
 			});
 		};
 		^chosenkey;
 	}
-	
+
 	// local
 	inRange {arg note; // check if an input note is in the range of the keyboard
 		if((note>startnote) && (note<(startnote + (octaves*12))), {^true}, {^false});
-	}
-	
-
-
-}
-
-MIDIKey {
-	var <rect, <>color, <note, <type;
-	var <>scalecolor, <>inscale;
-
-	classvar pix;
-
-	*initClass {
-		//pix = [0, 6, 10, 16, 20, 30, 36, 40, 46, 50, 56, 60];
-		pix = [ 0, 0.1, 0.17, 0.27, 0.33, 0.5, 0.6, 0.67, 0.77, 0.83, 0.93, 1 ]; // as above but normalized
-	}
-
-	*color { |note|
-		var colors = [Color.white, Color.black];
-		var i = note % 12;
-		^colors[((i == 1) || (i == 3) || (i == 6) || (i == 8) || (i == 10)).asInteger];
-	}
-
-	*rect { arg bounds, octaves, octave, note;
-		var j = octave;
-		var i = note % 12;
-		^(if ((this.color(i) == Color.black), {
-			// black keys
-			Rect(	( (pix[i]*((bounds.width/octaves) -
-				(bounds.width/octaves/7))).round(1) + ((bounds.width/octaves)*j)).round(1)+1,
-			0,
-			bounds.width/octaves/10,
-			bounds.height/1.7);
-		}, {
-			// white keys
-			Rect(((pix[i]*((bounds.width/octaves) -
-				(bounds.width/octaves/7))).round(1) + ((bounds.width/octaves)*j)).round(1),
-			0,
-			bounds.width/octaves/7,
-			bounds.height);
-		}));
-	}
-
-	*new { arg note, rect, type;
-		^super.new.initMIDIKey(note, rect, type);
-	}
-	
-	initMIDIKey {arg argnote, argrect, argtype;
-		note = argnote;
-		rect = argrect;
-		type = argtype;
-		color = argtype;
-		scalecolor = color;
-		inscale = false;
-	}
-
-	updateRect { arg bounds, octaves, octave;
-		rect = MIDIKey.rect(bounds, octaves, octave, note);
-		^rect;
 	}
 
 }
